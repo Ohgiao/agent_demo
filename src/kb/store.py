@@ -23,20 +23,29 @@ def get_engine() -> PGEngine:
     return PGEngine.from_connection_string(get_settings().postgres_dsn_async)
 
 
-async def ensure_schema() -> None:
-    """幂等地准备 pgvector 扩展和向量表。扩展需超级用户，这一步走 psycopg 而非 SQLAlchemy。"""
+async def ensure_schema() -> bool:
+    """准备 pgvector 扩展和向量表。返回 False 表示表已存在、本次跳过。
+
+    扩展需超级用户，这一步走 psycopg 而非 SQLAlchemy。
+    ainit_vectorstore_table 自己不做存在性检查（重复调用抛 DuplicateTableError），
+    所以幂等性由这里的 to_regclass 判断负责。
+    """
     import psycopg
     from langchain_postgres import Column
 
     s = get_settings()
     with psycopg.connect(s.postgres_dsn, autocommit=True, connect_timeout=5) as conn:
         conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        exists = conn.execute("select to_regclass(%s)", (f"public.{s.collection_name}",)).fetchone()[0]
+    if exists:
+        return False
 
     await get_engine().ainit_vectorstore_table(
         table_name=s.collection_name,
         vector_size=s.embedding_dim,
         metadata_columns=[Column(name=c, data_type="TEXT", nullable=True) for c in METADATA_COLUMNS],
     )
+    return True
 
 
 async def get_vectorstore() -> PGVectorStore:

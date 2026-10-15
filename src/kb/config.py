@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """所有可调参数集中在这里，环境变量前缀 KB_（见 .env.example）。"""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore",env_prefix="KB_")
 
     postgres_dsn: str = Field(default="postgresql://postgres:postgres@127.0.0.1:5432/kb_demo")
     collection_name: str = Field(default="kb_documents")

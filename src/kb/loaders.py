@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-
+from pypdf import PdfReader
+import chardet
 from langchain_core.documents import Document
 
 
@@ -22,4 +23,38 @@ def load(path: Path, *, dept: str) -> list[Document]:
     - pypdf.PdfReader(path).pages[i].extract_text()
     - 不必引入 langchain-community，自己 20 行写完更清楚。
     """
-    raise NotImplementedError("R1 未实现：文件 -> Document 列表")
+    docs: list[Document] = []
+
+    suffix = path.suffix.lower()
+    if suffix in (".txt", ".md"):
+        # 二进制读取，用chardet自动判断编码，解决GBK/utf8中文乱码
+        raw = path.read_bytes()
+        enc_info = chardet.detect(raw)
+        encoding = enc_info["encoding"] or "utf-8"
+        text = raw.decode(encoding, errors="replace")
+        # txt/md：整个文件作为1个Document，page固定0
+        docs.append(Document(
+            page_content=text,
+            metadata={
+                "source": path.name,
+                "dept": dept,
+                "page": 0
+            }
+        ))
+
+    elif suffix == ".pdf":
+        reader = PdfReader(path)
+        for page_idx, page in enumerate(reader.pages):
+            page_text = page.extract_text() or ""
+            docs.append(Document(
+                page_content=page_text,
+                metadata={
+                    "source": path.name,
+                    "dept": dept,
+                    "page": page_idx
+                }
+            ))
+    else:
+        raise ValueError(f"不支持的文件类型：{suffix}，仅支持 .txt .md .pdf")
+
+    return docs

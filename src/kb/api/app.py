@@ -19,10 +19,10 @@ WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 async def lifespan(app: FastAPI):
     """建表失败不阻止启动：让 /healthz 明确告诉你缺什么，而不是进程直接退出。"""
     try:
-        await store.ensure_schema()
-        log.info("向量表就绪")
+        created = await store.ensure_schema()
+        log.info("向量表已创建" if created else "向量表已存在，跳过建表")
     except Exception as exc:  # noqa: BLE001
-        log.warning("跳过建表（%s: %s）—— 请检查 .env 里的 KB_POSTGRES_DSN", type(exc).__name__, exc)
+        log.warning("建表失败（%s: %s）—— 请检查 .env 里的 KB_POSTGRES_DSN", type(exc).__name__, exc)
     yield
 
 
