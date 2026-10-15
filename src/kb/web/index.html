@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>知识库骨架</title>
+<style>
+  body { font: 14px/1.6 system-ui, "Microsoft YaHei", sans-serif; margin: 0; padding: 24px; background: #f6f7f9; color: #1f2328; }
+  main { max-width: 860px; margin: 0 auto; display: grid; gap: 16px; }
+  section { background: #fff; border: 1px solid #d8dee4; border-radius: 8px; padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 0 0 12px; color: #57606a; font-weight: 600; }
+  #banner { border-radius: 8px; padding: 10px 14px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  .ok { background: #dafbe1; border: 1px solid #4ac26b; }
+  .bad { background: #ffebe9; border: 1px solid #cf222e; }
+  input, select, button, textarea { font: inherit; padding: 6px 8px; border: 1px solid #d0d7de; border-radius: 6px; }
+  input[type=text], textarea { width: 70%; }
+  button { background: #1f883d; color: #fff; border: none; cursor: pointer; }
+  pre { background: #0d1117; color: #e6edf3; padding: 12px; border-radius: 6px; overflow: auto; max-height: 340px; margin: 12px 0 0; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>企业知识库骨架 · pgvector + LangChain + Ollama</h1>
+  <div id="banner" class="bad">检查环境…</div>
+
+  <section>
+    <h2>上传文档（R1/R3 未做时返回 501 题面）</h2>
+    <div class="row">
+      <input type="file" id="file" accept=".md,.txt,.pdf">
+      <select id="dept"><option>HR</option><option>FIN</option><option>ENG</option></select>
+      <button id="btnIngest">入库</button>
+    </div>
+    <pre id="outIngest" hidden></pre>
+  </section>
+
+  <section>
+    <h2>检索（R4）</h2>
+    <div class="row">
+      <input type="text" id="q" placeholder="例如：年假可以顺延吗" size="40">
+      <button id="btnSearch">搜索</button>
+    </div>
+    <pre id="outSearch" hidden></pre>
+  </section>
+
+  <section>
+    <h2>问答（R5）</h2>
+    <div class="row">
+      <textarea id="ask" rows="2" placeholder="例如：报销发票抬头要求是什么"></textarea>
+      <button id="btnAsk">提问</button>
+    </div>
+    <pre id="outAsk" hidden></pre>
+  </section>
+</main>
+
+<script>
+const banner = document.getElementById("banner");
+
+async function call(url, opts, out) {
+  out.hidden = false;
+  out.textContent = "…";
+  try {
+    const res = await fetch(url, opts);
+    const body = await res.json();
+    out.textContent = `${res.status} ${res.status === 501 ? "← 这道题还没实现" : ""}\n\n` +
+      JSON.stringify(body, null, 2);
+  } catch (e) {
+    out.textContent = "请求失败: " + e;
+  }
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch("/healthz");
+    const h = await r.json();
+    banner.className = h.status === "ok" ? "ok" : "bad";
+    banner.textContent = `healthz: ${h.status} | ollama(${h.ollama.detail}) | ` +
+      `postgres(${h.postgres.detail}) | 集合 ${h.collection}`;
+  } catch (e) {
+    banner.className = "bad";
+    banner.textContent = "后端没起来: " + e;
+  }
+}
+
+document.getElementById("btnIngest").onclick = () => {
+  const f = document.getElementById("file").files[0];
+  if (!f) return alert("先选一个文件");
+  const fd = new FormData();
+  fd.append("file", f);
+  fd.append("dept", document.getElementById("dept").value);
+  call("/api/documents", { method: "POST", body: fd }, document.getElementById("outIngest"));
+};
+
+document.getElementById("btnSearch").onclick = () =>
+  call("/api/search", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query: document.getElementById("q").value }),
+  }, document.getElementById("outSearch"));
+
+document.getElementById("btnAsk").onclick = () =>
+  call("/api/ask", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question: document.getElementById("ask").value }),
+  }, document.getElementById("outAsk"));
+
+checkHealth();
+</script>
+</body>
+</html>

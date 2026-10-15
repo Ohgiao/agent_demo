@@ -1,0 +1,11 @@
+# 本地密钥与产物
+.env
+data/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# 虚拟环境
+.venv/
